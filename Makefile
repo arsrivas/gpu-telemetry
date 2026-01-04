@@ -215,7 +215,7 @@ wipe-data: ## ⚠ Delete all PVC data (irreversible)
 	kubectl delete pvc -n $(NAMESPACE) --all
 
 # ===============================
-# Full pipeline
+# Full deployment pipeline
 # ===============================
 .PHONY: all
-all: test build load deploy
+all: all: test docker-build kind-load deploy
