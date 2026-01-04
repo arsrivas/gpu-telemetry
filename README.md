@@ -20,41 +20,7 @@ This repository represents a **focused but complete system**, suitable for an in
 
 ## High-Level Architecture (HLD)
 
-```mermaid
-flowchart LR
-    subgraph Ingestion
-        S1[Telemetry Streamer]
-        S2[Telemetry Streamer]
-    end
-
-    subgraph Messaging
-        MQ[Custom Message Queue\n(HTTP-based)]
-    end
-
-    subgraph Processing
-        C1[Telemetry Collector]
-        C2[Telemetry Collector]
-    end
-
-    subgraph Storage
-        DB[(PostgreSQL\nSystem of Record)]
-    end
-
-    subgraph API
-        API[API Gateway\n(REST + OpenAPI)]
-    end
-
-    S1 -->|Enqueue| MQ
-    S2 -->|Enqueue| MQ
-
-    MQ -->|Poll(batch)| C1
-    MQ -->|Poll(batch)| C2
-
-    C1 -->|Persist| DB
-    C2 -->|Persist| DB
-
-    API -->|Query| DB
-```
+![High-Level Architecture](docs/diagram/hld.svg)
 
 ### Architectural Notes
 
