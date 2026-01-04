@@ -73,6 +73,7 @@ help:
 	@echo "  make test                Run unit tests"
 	@echo "  make coverage            Run tests with coverage"
 	@echo "  make swagger             Generate OpenAPI spec"
+	@echo "  make fmt                 Run Go fmt"
 	@echo ""
 	@echo "Build targets:"
 	@echo "  make docker-build        Build all components"
@@ -218,4 +219,4 @@ wipe-data: ## ⚠ Delete all PVC data (irreversible)
 # Full pipeline
 # ===============================
 .PHONY: all
-all: test build load deploy
+all: test docker-build kind-load deploy

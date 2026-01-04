@@ -180,7 +180,7 @@ http://<IP>:8081/swagger/index.html
 └── README.md
 ```
 
-## Build & Run (Local)
+## Build & Run (Local) - QuickStart User install flow
 
 ### Prerequisites
 
@@ -218,17 +218,13 @@ Run unit tests with coverage
 ```
 make coverage
 ```
-### Kind cluster
+### Create kind cluster
 Create cluster
 ```
 make kind-create
 ```
-Delete cluster
-```
-make kind-delete
-```
 
-### Docker image build/clean
+### Build and load docker image
 Builds Docker images:
 
 - API
@@ -238,24 +234,15 @@ Builds Docker images:
 ```
 make docker-build
 ```
-Remove Docker images:
-```
-make docker-clean
-```
-### Load Docker image into Kind
 Load docker images into Kind
 ```
 make kind-load
 ```
 
-### Helm Deployment
+### Deploy using Helm
 Deploy chart to `telemetry` namespace
 ```
 make deploy
-```
-Uninstall chart
-```
-make undeploy
 ```
 ### Accessing the API locally
 
@@ -266,8 +253,23 @@ kubectl port-forward svc/telemetry-api 8081:8081 -n telemetry
 ```
 Swagger
 ```
-http://<IP>:8081/swagger/index.html
+http://localhost:8081/swagger/index.html
 ```
+---
+## Operations
+### Kind cluster management
+Create cluster (cluster config can be found in `deployment` folder)
+`make kind-create`
+Delete cluster
+`make kind-delete`
+### Docker Image management
+Remove all project Docker images:
+`make docker-clean`
+### Helm app lifecycle
+Uninstall Helm release
+`make undeploy`
+Upgrade
+`make deploy` 
 ---
 ## Helm Configuration
 Application configuration is defined in `values.yaml` and injected into pods
