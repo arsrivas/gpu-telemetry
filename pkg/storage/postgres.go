@@ -101,7 +101,7 @@ func (p *PostgresStore) GPUs() ([]string, error) {
 
 // Telemetry retrieves telemetry records for a specific GPU,
 // optionally filtered by a start and/or end timestamp.
-func (p *PostgresStore) Telemetry(gpu string, startTs, endTs *int64) ([]model.Telemetry, error) {
+func (p *PostgresStore) Telemetry(gpu string, startTs, endTs *time.Time) ([]model.Telemetry, error) {
 	query := `
 	SELECT id, gpu_id, ts, metric, value, labels
 	FROM telemetry
@@ -111,12 +111,12 @@ func (p *PostgresStore) Telemetry(gpu string, startTs, endTs *int64) ([]model.Te
 	argPos := 2
 
 	if startTs != nil {
-		query += " AND ts >= to_timestamp($" + itoa(argPos) + ")"
+		query += " AND ts >= $" + itoa(argPos)
 		args = append(args, *startTs)
 		argPos++
 	}
 	if endTs != nil {
-		query += " AND ts <= to_timestamp($" + itoa(argPos) + ")"
+		query += " AND ts <= $" + itoa(argPos)
 		args = append(args, *endTs)
 	}
 

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
@@ -142,7 +143,7 @@ func TestHandler_GetTelemetry(t *testing.T) {
 				GPUExistsFn: func(id string) (bool, error) {
 					return true, nil
 				},
-				TelemetryFn: func(id string, _, _ *int64) ([]model.Telemetry, error) {
+				TelemetryFn: func(id string, _, _ *time.Time) ([]model.Telemetry, error) {
 					return []model.Telemetry{
 						{ID: "1", GPUId: id, Metric: "util", Value: 80},
 					}, nil
@@ -189,7 +190,7 @@ func TestHandler_GetTelemetry(t *testing.T) {
 				GPUExistsFn: func(id string) (bool, error) {
 					return true, nil
 				},
-				TelemetryFn: func(id string, _, _ *int64) ([]model.Telemetry, error) {
+				TelemetryFn: func(id string, _, _ *time.Time) ([]model.Telemetry, error) {
 					return nil, errors.New("db error during telemetry fetch")
 				},
 			},

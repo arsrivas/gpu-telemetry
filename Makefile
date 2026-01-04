@@ -219,4 +219,4 @@ wipe-data: ## ⚠ Delete all PVC data (irreversible)
 # Full deployment pipeline
 # ===============================
 .PHONY: all
-all: all: test docker-build kind-load deploy
+all: test docker-build kind-load deploy
