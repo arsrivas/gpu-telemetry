@@ -195,6 +195,18 @@ func TestHandler_GetTelemetry(t *testing.T) {
 			},
 			wantStatus: http.StatusInternalServerError,
 		},
+		{
+
+			name:  "start_time greater than end_time",
+			gpuID: "GPU-1",
+			query: "?start_time=200&end_time=100",
+			store: &mocks.StoreMock{
+				GPUExistsFn: func(id string) (bool, error) {
+					return true, nil
+				},
+			},
+			wantStatus: http.StatusBadRequest,
+		},
 	}
 
 	log := zap.NewNop()
