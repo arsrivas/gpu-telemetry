@@ -147,7 +147,7 @@ make swagger
 ### Once the API server is running:
 
 ```
-http://localhost:8081/swagger/index.html
+http://<IP>:8081/swagger/index.html
 ```
 
 ## Project Structure
@@ -263,6 +263,10 @@ The API service can be accessed via port-forwarding:
 
 ```bash
 kubectl port-forward svc/telemetry-api 8081:8081 -n telemetry
+```
+Swagger
+```
+http://<IP>:8081/swagger/index.html
 ```
 ---
 ## Helm Configuration
