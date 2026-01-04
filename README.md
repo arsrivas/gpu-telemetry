@@ -205,18 +205,6 @@ Run unit tests with coverage
 ```
 make coverage
 ```
-
-### Docker image build
-Builds Docker images:
-
-- API
-- Collector
-- Streamer
-- MQ
-```
-make build
-```
-
 ### Kind cluster
 Create cluster
 ```
@@ -226,6 +214,18 @@ Delete cluster
 ```
 make kind-delete
 ```
+
+### Docker image build
+Builds Docker images:
+
+- API
+- Collector
+- Streamer
+- MQ
+```
+make docker-build
+```
+### Load Docker image into Kind
 Load docker images into Kind
 ```
 make kind-load

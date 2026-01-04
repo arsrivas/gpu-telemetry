@@ -185,7 +185,7 @@ kind-load: load-api load-collector load-mq load-streamer
 # ===============================
 .PHONY: deploy
 deploy:
-	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(NAMESPACE)
+	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(NAMESPACE) --create-namespace
 
 .PHONY: undeploy
 undeploy:
