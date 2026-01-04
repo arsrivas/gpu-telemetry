@@ -111,13 +111,13 @@ func TestPostgresStore_GPUExists(t *testing.T) {
 
 func TestPostgresStore_Telemetry(t *testing.T) {
 	now := time.Now()
-	start := now.Add(-time.Hour).Unix()
-	end := now.Unix()
+	start := now.Add(-time.Hour)
+	end := now
 
 	tests := []struct {
 		name      string
-		startTs   *int64
-		endTs     *int64
+		startTs   *time.Time
+		endTs     *time.Time
 		expectErr bool
 	}{
 		{

@@ -55,16 +55,16 @@ paths:
         name: id
         required: true
         type: string
-      - description: Start time (Unix timestamp in seconds)
-        format: int64
+      - description: Start time (RFC3339, UTC)
+        example: '"2025-01-05T10:00:00Z"'
         in: query
         name: start_time
-        type: integer
-      - description: End time (Unix timestamp in seconds)
-        format: int64
+        type: string
+      - description: End time (RFC3339, UTC)
+        example: '"2025-01-05T11:00:00Z"'
         in: query
         name: end_time
-        type: integer
+        type: string
       produces:
       - application/json
       responses:

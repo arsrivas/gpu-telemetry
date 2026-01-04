@@ -59,16 +59,16 @@
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "format": "int64",
-                        "description": "Start time (Unix timestamp in seconds)",
+                        "type": "string",
+                        "example": "\"2025-01-05T10:00:00Z\"",
+                        "description": "Start time (RFC3339, UTC)",
                         "name": "start_time",
                         "in": "query"
                     },
                     {
-                        "type": "integer",
-                        "format": "int64",
-                        "description": "End time (Unix timestamp in seconds)",
+                        "type": "string",
+                        "example": "\"2025-01-05T11:00:00Z\"",
+                        "description": "End time (RFC3339, UTC)",
                         "name": "end_time",
                         "in": "query"
                     }

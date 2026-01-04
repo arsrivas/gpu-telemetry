@@ -1,6 +1,9 @@
 package storage
 
-import "gpu-telemetry/model"
+import (
+	"gpu-telemetry/model"
+	"time"
+)
 
 // Store defines the persistence contract used by Collector and API
 type Store interface {
@@ -10,8 +13,8 @@ type Store interface {
 	GPUs() ([]string, error)
 
 	// Telemetry returns telemetry for a GPU ordered by time
-	// startTs / endTs are optional (unix seconds)
-	Telemetry(gpuID string, startTs, endTs *int64) ([]model.Telemetry, error)
+	// startTs / endTs are optional
+	Telemetry(gpuID string, startTs, endTs *time.Time) ([]model.Telemetry, error)
 	GPUExists(gpuID string) (bool, error)
 	Ping() error
 	Close() error

@@ -1,12 +1,15 @@
 package mock
 
-import "gpu-telemetry/model"
+import (
+	"gpu-telemetry/model"
+	"time"
+)
 
 // StoreMock implements storage.Store
 type StoreMock struct {
 	GPUsFn      func() ([]string, error)
 	GPUExistsFn func(id string) (bool, error)
-	TelemetryFn func(id string, start, end *int64) ([]model.Telemetry, error)
+	TelemetryFn func(id string, start, end *time.Time) ([]model.Telemetry, error)
 	InsertFn    func(model.Telemetry) error
 	PingFn      func() error
 	CloseFn     func() error
@@ -20,7 +23,7 @@ func (m *StoreMock) GPUExists(id string) (bool, error) {
 	return m.GPUExistsFn(id)
 }
 
-func (m *StoreMock) Telemetry(id string, start, end *int64) ([]model.Telemetry, error) {
+func (m *StoreMock) Telemetry(id string, start, end *time.Time) ([]model.Telemetry, error) {
 	return m.TelemetryFn(id, start, end)
 }
 

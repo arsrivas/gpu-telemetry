@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
+	"time"
 
 	"gpu-telemetry/model"
 	"gpu-telemetry/pkg/storage"
@@ -54,8 +54,8 @@ func (h *Handler) ListGPUs(w http.ResponseWriter, _ *http.Request) {
 // @Tags         Telemetry
 // @Produce      json
 // @Param        id path string true "GPU ID"
-// @Param        start_time query int64 false "Start time (Unix timestamp in seconds)"
-// @Param        end_time query int64 false "End time (Unix timestamp in seconds)"
+// @Param        start_time query string false "Start time (RFC3339, UTC)" example("2025-01-05T10:00:00Z")
+// @Param        end_time   query string false "End time (RFC3339, UTC)" example("2025-01-05T11:00:00Z")
 // @Success      200 {array} model.TelemetryResponse
 // @Failure      400 {object} model.ErrorResponse
 // @Failure      404 {object} model.ErrorResponse
@@ -68,29 +68,27 @@ func (h *Handler) GetTelemetry(w http.ResponseWriter, r *http.Request) {
 	gpuID := chi.URLParam(r, "id")
 	h.log.Info("get telemetry request received", zap.String("gpu_id", gpuID))
 
-	var start, end *int64
+	var start, end *time.Time
 
 	if v := r.URL.Query().Get("start_time"); v != "" {
-		ts, err := strconv.ParseInt(v, 10, 64)
+		ts, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			h.log.Warn("invalid start_time", zap.String("gpu_id", gpuID), zap.String("value", v))
-			writeError(w, http.StatusBadRequest, "invalid start_time")
+			writeError(w, http.StatusBadRequest, "invalid start_time (must be RFC3339)")
 			return
 		}
 		start = &ts
 	}
 
 	if v := r.URL.Query().Get("end_time"); v != "" {
-		ts, err := strconv.ParseInt(v, 10, 64)
+		ts, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			h.log.Warn("invalid end_time", zap.String("gpu_id", gpuID), zap.String("value", v))
-			writeError(w, http.StatusBadRequest, "invalid end_time")
+			writeError(w, http.StatusBadRequest, "invalid end_time (must be RFC3339)")
 			return
 		}
 		end = &ts
 	}
 
-	if start != nil && end != nil && *start > *end {
+	if start != nil && end != nil && start.After(*end) {
 		writeError(w, http.StatusBadRequest, "start_time must be <= end_time")
 		return
 	}
