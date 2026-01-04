@@ -160,7 +160,8 @@ docker-clean: clean-api clean-collector clean-mq clean-streamer
 # ===============================
 .PHONY: kind-create
 kind-create:
-	kind create cluster --name $(KIND_CLUSTER) || true
+	kind get clusters | grep -q "^$(KIND_CLUSTER)$$" || \
+	kind create cluster --name $(KIND_CLUSTER) --config kind-cluster.yaml
 
 .PHONY: kind-delete
 kind-delete:
