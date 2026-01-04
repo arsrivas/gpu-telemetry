@@ -119,6 +119,7 @@ func TestHandler_Health(t *testing.T) {
 }
 
 func TestHandler_GetTelemetry(t *testing.T) {
+	log := zap.NewNop()
 	tests := []struct {
 		name       string
 		store      *mocks.StoreMock
@@ -130,7 +131,7 @@ func TestHandler_GetTelemetry(t *testing.T) {
 			name:  "gpu not found",
 			gpuID: "GPU-X",
 			store: &mocks.StoreMock{
-				GPUExistsFn: func(id string) (bool, error) {
+				GPUExistsFn: func(string) (bool, error) {
 					return false, nil
 				},
 			},
@@ -140,12 +141,18 @@ func TestHandler_GetTelemetry(t *testing.T) {
 			name:  "telemetry success",
 			gpuID: "GPU-1",
 			store: &mocks.StoreMock{
-				GPUExistsFn: func(id string) (bool, error) {
+				GPUExistsFn: func(string) (bool, error) {
 					return true, nil
 				},
-				TelemetryFn: func(id string, _, _ *time.Time) ([]model.Telemetry, error) {
+				TelemetryFn: func(string, *time.Time, *time.Time) ([]model.Telemetry, error) {
 					return []model.Telemetry{
-						{ID: "1", GPUId: id, Metric: "util", Value: 80},
+						{
+							ID:        "1",
+							GPUId:     "GPU-1",
+							Timestamp: time.Now().UTC(),
+							Metric:    "util",
+							Value:     80,
+						},
 					}, nil
 				},
 			},
@@ -154,10 +161,11 @@ func TestHandler_GetTelemetry(t *testing.T) {
 		{
 			name:  "invalid start_time",
 			gpuID: "GPU-1",
-			query: "?start_time=abc",
+			query: "?start_time=invalid",
 			store: &mocks.StoreMock{
-				GPUExistsFn: func(id string) (bool, error) {
-					return true, nil
+				GPUExistsFn: func(string) (bool, error) {
+					t.Fatal("GPUExists must not be called")
+					return false, nil
 				},
 			},
 			wantStatus: http.StatusBadRequest,
@@ -165,10 +173,23 @@ func TestHandler_GetTelemetry(t *testing.T) {
 		{
 			name:  "invalid end_time",
 			gpuID: "GPU-1",
-			query: "?end_time=not-a-number",
+			query: "?end_time=invalid",
 			store: &mocks.StoreMock{
-				GPUExistsFn: func(id string) (bool, error) {
-					return true, nil
+				GPUExistsFn: func(string) (bool, error) {
+					t.Fatal("GPUExists must not be called")
+					return false, nil
+				},
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:  "start_time greater than end_time",
+			gpuID: "GPU-1",
+			query: "?start_time=2025-01-05T11:00:00Z&end_time=2025-01-05T10:00:00Z",
+			store: &mocks.StoreMock{
+				GPUExistsFn: func(string) (bool, error) {
+					t.Fatal("GPUExists must not be called")
+					return false, nil
 				},
 			},
 			wantStatus: http.StatusBadRequest,
@@ -177,8 +198,8 @@ func TestHandler_GetTelemetry(t *testing.T) {
 			name:  "gpu exists check fails",
 			gpuID: "GPU-1",
 			store: &mocks.StoreMock{
-				GPUExistsFn: func(id string) (bool, error) {
-					return false, errors.New("db error during exists check")
+				GPUExistsFn: func(string) (bool, error) {
+					return false, errors.New("db error")
 				},
 			},
 			wantStatus: http.StatusInternalServerError,
@@ -187,49 +208,39 @@ func TestHandler_GetTelemetry(t *testing.T) {
 			name:  "telemetry fetch fails",
 			gpuID: "GPU-1",
 			store: &mocks.StoreMock{
-				GPUExistsFn: func(id string) (bool, error) {
+				GPUExistsFn: func(string) (bool, error) {
 					return true, nil
 				},
-				TelemetryFn: func(id string, _, _ *time.Time) ([]model.Telemetry, error) {
-					return nil, errors.New("db error during telemetry fetch")
+				TelemetryFn: func(string, *time.Time, *time.Time) ([]model.Telemetry, error) {
+					return nil, errors.New("db error")
 				},
 			},
 			wantStatus: http.StatusInternalServerError,
 		},
-		{
-
-			name:  "start_time greater than end_time",
-			gpuID: "GPU-1",
-			query: "?start_time=200&end_time=100",
-			store: &mocks.StoreMock{
-				GPUExistsFn: func(id string) (bool, error) {
-					return true, nil
-				},
-			},
-			wantStatus: http.StatusBadRequest,
-		},
 	}
-
-	log := zap.NewNop()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := api.NewHandler(tt.store, log)
-
 			req := httptest.NewRequest(
 				http.MethodGet,
 				"/api/v1/gpus/"+tt.gpuID+"/telemetry"+tt.query,
 				nil,
 			)
-
 			rctx := chi.NewRouteContext()
 			rctx.URLParams.Add("id", tt.gpuID)
 			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
-
 			rr := httptest.NewRecorder()
 			h.GetTelemetry(rr, req)
-
 			require.Equal(t, tt.wantStatus, rr.Code)
+			// Assert response body for determinism
+			if tt.wantStatus == http.StatusOK {
+				var resp []model.TelemetryResponse
+				require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+			} else {
+				var errResp model.ErrorResponse
+				require.NoError(t, json.NewDecoder(rr.Body).Decode(&errResp))
+				require.NotEmpty(t, errResp.Message)
+			}
 		})
 	}
 }

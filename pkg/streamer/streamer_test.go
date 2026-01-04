@@ -10,52 +10,53 @@ import (
 
 	"gpu-telemetry/pkg/client"
 
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
 func TestStreamer_Run_EnqueuesMessages(t *testing.T) {
 	// --- temp CSV file ---
-	csv := `uuid,metric_name,value,labels_raw
+	csvData := `uuid,metric_name,value,labels_raw
 gpu-1,temp,42.5,lab1
 `
-
 	f, err := os.CreateTemp("", "telemetry-*.csv")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.Remove(f.Name())
-
-	_, _ = f.WriteString(csv)
-	f.Close()
-
+	_, err = f.WriteString(csvData)
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	// --- signal channel ---
+	enqueuedCh := make(chan struct{}, 1)
 	// --- fake MQ server ---
-	enqueued := 0
 	mqServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/enqueue" {
-			enqueued++
+			select {
+			case enqueuedCh <- struct{}{}:
+			default:
+			}
 			w.WriteHeader(http.StatusAccepted)
 			return
 		}
 		http.NotFound(w, r)
 	}))
 	defer mqServer.Close()
-
-	mq := client.NewMQClient(mqServer.URL)
-
+	mqClient := client.NewMQClient(mqServer.URL)
 	s := New(
-		mq,
+		mqClient,
 		f.Name(),
-		10*time.Millisecond,
+		0, // no sleep for deterministic behavior
 		zap.NewNop(),
 	)
-
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go s.Run(ctx)
-
-	time.Sleep(100 * time.Millisecond)
-	cancel()
-
-	if enqueued == 0 {
-		t.Fatalf("expected at least one enqueue, got %d", enqueued)
+	// --- wait for exactly one enqueue ---
+	select {
+	case <-enqueuedCh:
+		// success
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for enqueue")
 	}
+	// stop streamer immediately
+	cancel()
 }
