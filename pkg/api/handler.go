@@ -17,6 +17,7 @@ type Handler struct {
 	log   *zap.Logger
 }
 
+// NewHandler constructs a new API handler with its dependencies injected.
 func NewHandler(store storage.Store, log *zap.Logger) *Handler {
 	return &Handler{
 		store: store,
@@ -32,6 +33,9 @@ func NewHandler(store storage.Store, log *zap.Logger) *Handler {
 // @Success      200 {array} string
 // @Failure      500 {object} model.ErrorResponse
 // @Router       /api/v1/gpus [get]
+//
+// ListGPUs returns a list of GPU identifiers for which telemetry
+// has been persisted.
 func (h *Handler) ListGPUs(w http.ResponseWriter, _ *http.Request) {
 	h.log.Info("List GPUs request received")
 	gpus, err := h.store.GPUs()
@@ -57,6 +61,9 @@ func (h *Handler) ListGPUs(w http.ResponseWriter, _ *http.Request) {
 // @Failure      404 {object} model.ErrorResponse
 // @Failure      500 {object} model.ErrorResponse
 // @Router       /api/v1/gpus/{id}/telemetry [get]
+//
+// GetTelemetry returns telemetry datapoints for a specific GPU,
+// optionally filtered by a time window.
 func (h *Handler) GetTelemetry(w http.ResponseWriter, r *http.Request) {
 	gpuID := chi.URLParam(r, "id")
 	h.log.Info("get telemetry request received", zap.String("gpu_id", gpuID))
@@ -120,6 +127,7 @@ func (h *Handler) GetTelemetry(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// Health implements a readiness probe for the API.
 func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 	if err := h.store.Ping(); err != nil {
 		writeError(w, http.StatusServiceUnavailable, "DB not ready")
@@ -128,12 +136,16 @@ func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// writeJSON serializes the given value as JSON and writes it
+// with the provided HTTP status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+// writeError writes a standardized JSON error response.
+// It is intentionally minimal to keep error handling consistent.
 func writeError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

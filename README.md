@@ -3,7 +3,7 @@
 ## Overview
 
 This project implements an **end-to-end elastic GPU telemetry pipeline** for an AI cluster.  
-It simulates continuous GPU telemetry ingestion, transport, persistence, and querying using a **custom-built message queue** (explicitly **not Kafka, RabbitMQ, ZeroMQ**, etc.).
+It simulates continuous GPU telemetry ingestion, transport, persistence, and querying using a **custom-built message queue**
 
 The system is designed to demonstrate:
 
@@ -11,10 +11,8 @@ The system is designed to demonstrate:
 - Clean system boundaries
 - Correct message-queue semantics
 - Kubernetes-native deployment
-- Production-grade Go practices
+- Idiomatic Go practices
 - Thoughtful and transparent use of AI assistance
-
-This repository represents a **focused but complete system**, suitable for an interview evaluation.
 
 ---
 
@@ -27,6 +25,7 @@ This repository represents a **focused but complete system**, suitable for an in
 - **Streamers** and **Collectors** are stateless → scale horizontally
 - **Message Queue** provides at-least-once delivery semantics
 - **PostgreSQL** is the system of record
+- **TelemetryRetention** cron job cleans up old entries periodically
 - **API Gateway** reads directly from DB (not from collectors)
 - **Helm + Kubernetes** manage lifecycle and scaling
 - **Kind** is used for local cluster simulation
@@ -96,6 +95,9 @@ This repository represents a **focused but complete system**, suitable for an in
 - Correct HTTP semantics and error handling
 - Readiness probe via `/healthz`
 - Swagger/OpenAPI auto-generated
+
+### 6. Telemetry Retention
+- CronJob to periodically clean old entries from DB
 
 ---
 ## Sample User Workflow
@@ -238,16 +240,23 @@ Uninstall chart
 ```
 make undeploy
 ```
+## Helm Configuration
+### Scaling
+Streamers and Collectors are stateless and can be scaled via `values.yaml`:
+```
+collector:
+  replicas: 2
 
----
-## Scaling the System
-Streamers and Collectors are stateless and can be scaled using commands:
-### Scale Streamers
-```kubectl scale deployment telemetry-streamer --replicas=5 -n telemetry```
-
-### Scale Collectors
-```kubectl scale deployment telemetry-collector --replicas=5 -n telemetry```
-
+streamer:
+  replicas: 1
+```
+### Telemetry retention
+Periodic cleanup of old telemetry data via `CronJob`
+```
+retention:
+  enabled: true
+  retentionDays: 1
+```
 ---
 ## Observability
 

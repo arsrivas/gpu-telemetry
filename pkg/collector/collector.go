@@ -13,12 +13,15 @@ import (
 	"go.uber.org/zap"
 )
 
+// Collector consumes telemetry messages from the message queue
+// and persists them into the storage layer.
 type Collector struct {
 	MQ    *client.MQClient
 	Store storage.Store
 	log   *zap.Logger
 }
 
+// New constructs a new Collector instance with its dependencies injected.
 func New(mq *client.MQClient, store storage.Store, log *zap.Logger) *Collector {
 	return &Collector{
 		MQ:    mq,
@@ -27,6 +30,7 @@ func New(mq *client.MQClient, store storage.Store, log *zap.Logger) *Collector {
 	}
 }
 
+// Run starts the main collector loop.
 func (c *Collector) Run(ctx context.Context) {
 
 	// health server
@@ -82,6 +86,7 @@ func (c *Collector) Run(ctx context.Context) {
 	}
 }
 
+// startHealthServer starts an HTTP server that exposes a readiness endpoint.
 func (c *Collector) startHealthServer() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", c.Health)
@@ -95,6 +100,7 @@ func (c *Collector) startHealthServer() {
 	_ = srv.ListenAndServe()
 }
 
+// Health implements a readiness probe for the collector.
 func (c *Collector) Health(w http.ResponseWriter, _ *http.Request) {
 	if err := c.Store.Ping(); err != nil {
 		http.Error(w, "db not ready", http.StatusServiceUnavailable)
