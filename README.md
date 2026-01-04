@@ -259,17 +259,27 @@ http://localhost:8081/swagger/index.html
 ## Operations
 ### Kind cluster management
 Create cluster (cluster config can be found in `deployment` folder)
-`make kind-create`
+```
+make kind-create
+```
 Delete cluster
-`make kind-delete`
+```
+make kind-delete
+```
 ### Docker Image management
 Remove all project Docker images:
-`make docker-clean`
+```
+make docker-clean
+```
 ### Helm app lifecycle
 Uninstall Helm release
-`make undeploy`
+```
+make undeploy
+```
 Upgrade
-`make deploy` 
+```
+make deploy
+``` 
 ---
 ## Helm Configuration
 Application configuration is defined in `values.yaml` and injected into pods
