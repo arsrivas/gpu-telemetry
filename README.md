@@ -228,7 +228,7 @@ Delete cluster
 make kind-delete
 ```
 
-### Docker image build
+### Docker image build/clean
 Builds Docker images:
 
 - API
@@ -237,6 +237,10 @@ Builds Docker images:
 - MQ
 ```
 make docker-build
+```
+Remove Docker images:
+```
+make docker-clean
 ```
 ### Load Docker image into Kind
 Load docker images into Kind
@@ -253,6 +257,14 @@ Uninstall chart
 ```
 make undeploy
 ```
+### Accessing the API locally
+
+The API service can be accessed via port-forwarding:
+
+```bash
+kubectl port-forward svc/telemetry-api 8081:8081 -n telemetry
+```
+---
 ## Helm Configuration
 Application configuration is defined in `values.yaml` and injected into pods
 as environment variables via the Helm chart.
@@ -283,6 +295,17 @@ retention:
 - Errors include contextual fields (GPU ID, message ID, etc.)
 - Kubernetes readiness probe exposed via /healthz
 
+---
+## Troubleshooting
+
+### Resetting PostgreSQL data (development only)
+
+If you need to reset the local PostgreSQL state during development,
+the persistent volume claim can be deleted:
+
+```bash
+kubectl delete pvc data-telemetry-postgres-0 -n telemetry
+```
 ---
 ## Design Tradeoffs
 

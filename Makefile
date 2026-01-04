@@ -60,7 +60,6 @@ preflight: ## Validate environment and tools
 	$(call REQUIRE_TOOL,kubectl)
 	$(call REQUIRE_TOOL,helm)
 	$(call REQUIRE_TOOL,kind)
-	$(call REQUIRE_TOOL,swag)
 	@echo "$(GREEN)✔ All required tools are installed$(NC)"
 
 # ===============================
