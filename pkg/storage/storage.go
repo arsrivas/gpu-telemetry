@@ -13,7 +13,7 @@ type Store interface {
 	GPUs() ([]string, error)
 
 	// Telemetry returns telemetry for a GPU ordered by time
-	// startTs / endTs are optional (unix seconds)
+	// startTs / endTs are optional
 	Telemetry(gpuID string, startTs, endTs *time.Time) ([]model.Telemetry, error)
 	GPUExists(gpuID string) (bool, error)
 	Ping() error
