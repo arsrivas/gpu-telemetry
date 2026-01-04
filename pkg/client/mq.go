@@ -9,10 +9,14 @@ import (
 	"gpu-telemetry/pkg/mq"
 )
 
+// MQClient is a lightweight HTTP client used to communicate with
+// the custom message queue service.
 type MQClient struct {
 	BaseURL string
 }
 
+// NewMQClient constructs a new MQ client for communicating with
+// the message queue service.
 func NewMQClient(url string) *MQClient {
 	return &MQClient{BaseURL: url}
 }
@@ -61,6 +65,7 @@ func (c *MQClient) Enqueue(env mq.Envelope) error {
 	return nil
 }
 
+// Ack acknowledges successful processing of a message with the given ID.
 func (c *MQClient) Ack(id string) error {
 	req, _ := http.NewRequest("POST", fmt.Sprintf("%s/ack?id=%s", c.BaseURL, id), bytes.NewBuffer(nil))
 	resp, err := http.DefaultClient.Do(req)

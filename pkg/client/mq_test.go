@@ -6,8 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"gpu-telemetry/model"
 	"gpu-telemetry/pkg/mq"
+
+	"github.com/stretchr/testify/require"
 )
 
 //
@@ -19,130 +20,149 @@ import (
 func TestMQClient_Poll(t *testing.T) {
 	tests := []struct {
 		name      string
-		response  []model.Telemetry
+		handler   http.HandlerFunc
 		wantCount int
+		wantErr   bool
 	}{
 		{
 			name: "poll returns messages",
-			response: []model.Telemetry{
-				{ID: "1", GPUId: "gpu-1"},
-				{ID: "2", GPUId: "gpu-2"},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, "/poll", r.URL.Path)
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode([]mq.Envelope{
+					{ID: "1", Key: "k1"},
+					{ID: "2", Key: "k2"},
+				})
 			},
 			wantCount: 2,
 		},
 		{
-			name:      "poll returns empty list",
-			response:  []model.Telemetry{},
+			name: "poll returns empty list",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode([]mq.Envelope{})
+			},
 			wantCount: 0,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// fake MQ server
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path != "/poll" {
-					http.NotFound(w, r)
-					return
-				}
-				_ = json.NewEncoder(w).Encode(tt.response)
-			}))
-			defer srv.Close()
-
-			client := NewMQClient(srv.URL)
-
-			msgs, err := client.Poll(10)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if len(msgs) != tt.wantCount {
-				t.Fatalf("got %d messages, want %d", len(msgs), tt.wantCount)
-			}
-		})
-	}
-}
-
-func TestMQClient_Ack(t *testing.T) {
-	tests := []struct {
-		name       string
-		wantCalled bool
-	}{
 		{
-			name:       "ack succeeds",
-			wantCalled: true,
+			name: "poll returns non-200",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+			},
+			wantErr: true,
+		},
+		{
+			name: "poll returns invalid json",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("{invalid-json"))
+			},
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			called := false
-
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/ack" {
-					called = true
-					w.WriteHeader(http.StatusOK)
-					return
-				}
-				http.NotFound(w, r)
-			}))
+			srv := httptest.NewServer(tt.handler)
 			defer srv.Close()
 
 			client := NewMQClient(srv.URL)
+			envs, err := client.Poll(10)
 
-			err := client.Ack("1")
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
 			}
 
-			if called != tt.wantCalled {
-				t.Fatalf("ack called = %v, want %v", called, tt.wantCalled)
-			}
+			require.NoError(t, err)
+			require.Len(t, envs, tt.wantCount)
 		})
 	}
 }
+
+//
+// ──────────────────────────────
+// Enqueue tests
+// ──────────────────────────────
+//
 
 func TestMQClient_Enqueue(t *testing.T) {
 	tests := []struct {
-		name       string
-		msg        mq.Envelope
-		wantCalled bool
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
 	}{
 		{
 			name: "enqueue succeeds",
-			msg: mq.Envelope{
-				ID:      "abcd",
-				Key:     "abcd",
-				Payload: []byte{1, 2, 3},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, "/enqueue", r.URL.Path)
+				require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+				w.WriteHeader(http.StatusAccepted)
 			},
-			wantCalled: true,
+		},
+		{
+			name: "enqueue returns non-202",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusBadRequest)
+			},
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			called := false
-
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/enqueue" {
-					called = true
-					w.WriteHeader(http.StatusAccepted)
-					return
-				}
-				http.NotFound(w, r)
-			}))
+			srv := httptest.NewServer(tt.handler)
 			defer srv.Close()
 
 			client := NewMQClient(srv.URL)
 
-			err := client.Enqueue(tt.msg)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			err := client.Enqueue(mq.Envelope{
+				ID:      "id-1",
+				Key:     "key-1",
+				Payload: []byte{1, 2, 3},
+			})
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
 			}
 
-			if called != tt.wantCalled {
-				t.Fatalf("enqueue called = %v, want %v", called, tt.wantCalled)
-			}
+			require.NoError(t, err)
 		})
 	}
+}
+
+//
+// ──────────────────────────────
+// Ack tests
+// ──────────────────────────────
+//
+
+func TestMQClient_Ack(t *testing.T) {
+	t.Run("ack succeeds", func(t *testing.T) {
+		called := false
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/ack", r.URL.Path)
+			called = true
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer srv.Close()
+
+		client := NewMQClient(srv.URL)
+
+		err := client.Ack("123")
+		require.NoError(t, err)
+		require.True(t, called)
+	})
+
+	t.Run("ack http failure", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		srv.Close() // force transport error
+
+		client := NewMQClient(srv.URL)
+
+		err := client.Ack("123")
+		require.Error(t, err)
+	})
 }

@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// NewLogger generates new logger instance
 func NewLogger(level string) (*zap.Logger, error) {
 	cfg := zap.NewProductionConfig()
 

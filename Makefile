@@ -9,6 +9,9 @@ NAMESPACE    := telemetry
 COMPONENTS := api collector mq streamer
 
 GO := go
+GOBIN    := $(shell $(GO) env GOBIN)
+GOPATH   := $(shell $(GO) env GOPATH)
+BIN_DIR  := $(if $(GOBIN),$(GOBIN),$(GOPATH)/bin)
 COVERAGE_FILE := coverage.out
 OS := $(shell go env GOOS)
 
@@ -57,7 +60,6 @@ preflight: ## Validate environment and tools
 	$(call REQUIRE_TOOL,kubectl)
 	$(call REQUIRE_TOOL,helm)
 	$(call REQUIRE_TOOL,kind)
-	$(call REQUIRE_TOOL,swag)
 	@echo "$(GREEN)✔ All required tools are installed$(NC)"
 
 # ===============================
@@ -160,7 +162,8 @@ docker-clean: clean-api clean-collector clean-mq clean-streamer
 # ===============================
 .PHONY: kind-create
 kind-create:
-	kind create cluster --name $(KIND_CLUSTER) || true
+	kind get clusters | grep -q "^$(KIND_CLUSTER)$$" || \
+	kind create cluster --name $(KIND_CLUSTER) --config deployment/kind-config.yaml
 
 .PHONY: kind-delete
 kind-delete:
@@ -184,7 +187,7 @@ kind-load: load-api load-collector load-mq load-streamer
 # ===============================
 .PHONY: deploy
 deploy:
-	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(NAMESPACE)
+	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(NAMESPACE) --create-namespace
 
 .PHONY: undeploy
 undeploy:
@@ -193,7 +196,7 @@ undeploy:
 # ===============================
 # Swagger / OpenAPI
 # ===============================
-SWAG := $(GOPATH)/bin/swag
+SWAG := $(BIN_DIR)/swag
 
 .PHONY: swagger
 swagger: $(SWAG)

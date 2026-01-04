@@ -1,8 +1,0 @@
-server_port: "8081"
-
-postgres_dsn: "postgresql://telemetry:telemetry@telemetry-postgres-postgresql:5432/telemetry?sslmode=disable"
-
-mq_url: "http://localhost:8080"
-
-metrics_enabled: false
-metrics_port: "9090"

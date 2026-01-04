@@ -12,15 +12,17 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// PostgresStore implements the Store interface backed by PostgreSQL.
 type PostgresStore struct {
 	db *sql.DB
 }
 
+// NewPostgres initializes a new PostgresStore with retry and backoff logic.
 func NewPostgres(dsn string) (*PostgresStore, error) {
 	backoff := time.Second
 	var lastErr error
 
-	for attempt := 1; attempt <= 6; attempt++ {
+	for attempt := 1; attempt <= 7; attempt++ {
 		db, err := sql.Open("postgres", dsn)
 		if err != nil {
 			lastErr = err
@@ -37,7 +39,7 @@ func NewPostgres(dsn string) (*PostgresStore, error) {
 		}
 
 		log.Printf(
-			"[postgres] connection failed (attempt %d/5): %v — retrying in %s",
+			"[postgres] connection failed (attempt %d/7): %v — retrying in %s",
 			attempt,
 			lastErr,
 			backoff,
@@ -50,6 +52,7 @@ func NewPostgres(dsn string) (*PostgresStore, error) {
 	return nil, fmt.Errorf("failed to connect to postgres after 5 attempts: %w", lastErr)
 }
 
+// init initializes the database schema if it does not already exist.
 func (p *PostgresStore) init() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS telemetry (
@@ -67,6 +70,7 @@ func (p *PostgresStore) init() error {
 	return err
 }
 
+// Insert persists a telemetry record into PostgreSQL.
 func (p *PostgresStore) Insert(t model.Telemetry) error {
 	_, err := p.db.Exec(`
 		INSERT INTO telemetry (id, gpu_id, ts, metric, value, labels)
@@ -78,6 +82,7 @@ func (p *PostgresStore) Insert(t model.Telemetry) error {
 	return err
 }
 
+// GPUs returns a list of distinct GPU IDs for which telemetry exists.
 func (p *PostgresStore) GPUs() ([]string, error) {
 	rows, err := p.db.Query(`SELECT DISTINCT gpu_id FROM telemetry`)
 	if err != nil {
@@ -94,11 +99,9 @@ func (p *PostgresStore) GPUs() ([]string, error) {
 	return res, nil
 }
 
-func (p *PostgresStore) Telemetry(
-	gpu string,
-	startTs, endTs *int64,
-) ([]model.Telemetry, error) {
-
+// Telemetry retrieves telemetry records for a specific GPU,
+// optionally filtered by a start and/or end timestamp.
+func (p *PostgresStore) Telemetry(gpu string, startTs, endTs *int64) ([]model.Telemetry, error) {
 	query := `
 	SELECT id, gpu_id, ts, metric, value, labels
 	FROM telemetry
@@ -141,6 +144,7 @@ func (p *PostgresStore) Telemetry(
 	return out, nil
 }
 
+// GPUExists checks whether any telemetry exists for the given GPU ID.
 func (p *PostgresStore) GPUExists(gpuID string) (bool, error) {
 	var exists bool
 	err := p.db.QueryRow(`
@@ -152,10 +156,12 @@ func (p *PostgresStore) GPUExists(gpuID string) (bool, error) {
 	return exists, err
 }
 
+// Ping verifies database connectivity.
 func (p *PostgresStore) Ping() error {
 	return p.db.Ping()
 }
 
+// Close releases all database resources and connections.
 func (p *PostgresStore) Close() error {
 	return p.db.Close()
 }

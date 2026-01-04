@@ -21,10 +21,13 @@ spec:
         - name: mq
           image: "{{ .Values.mq.image.repository }}:{{ .Values.mq.image.tag }}"
           imagePullPolicy: IfNotPresent
-
+          env:
+          - name: MQ_PARTITIONS
+            value: {{ .Values.mq.partitions | quote }}
+          - name: LOG_LEVEL
+            value: {{ .Values.mq.logLevel | default "info" | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.mq.servicePort }}
-
           resources:
             {{- toYaml .Values.mq.resources | nindent 12 }}

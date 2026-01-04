@@ -7,6 +7,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
+// Router constructs and configures the HTTP router for the API.
 func Router(h *Handler) http.Handler {
 	r := chi.NewRouter()
 	r.Use(RequestLogger(h.log))

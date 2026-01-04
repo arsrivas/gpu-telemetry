@@ -18,6 +18,8 @@ import (
 	"gpu-telemetry/pkg/mq"
 )
 
+// Streamer reads telemetry data from a CSV file and continuously
+// streams it to the message queue.
 type Streamer struct {
 	MQ       *client.MQClient
 	Interval time.Duration
@@ -25,6 +27,7 @@ type Streamer struct {
 	log      *zap.Logger
 }
 
+// New constructs a new Streamer instance.
 func New(mq *client.MQClient, file string, interval time.Duration, log *zap.Logger) *Streamer {
 	return &Streamer{
 		MQ:       mq,
@@ -34,6 +37,7 @@ func New(mq *client.MQClient, file string, interval time.Duration, log *zap.Logg
 	}
 }
 
+// Run starts the main streaming loop.
 func (s *Streamer) Run(ctx context.Context) {
 	normalize := func(s string) string {
 		s = strings.TrimSpace(s)

@@ -34,11 +34,9 @@ spec:
             # --- database ---
             - name: POSTGRES_DSN
               value: "{{ .Values.global.postgres.dsn }}"
-            # --- metrics ---
-            - name: METRICS_ENABLED
-              value: "{{ .Values.metrics.enabled }}"
-            - name: METRICS_PORT
-              value: "{{ .Values.metrics.port }}"
+            # --- logLevel ---
+            - name: LOG_LEVEL
+              value: {{ .Values.api.logLevel | default .Values.global.logLevel | quote }}  
           readinessProbe:
             httpGet:
               path: /healthz
