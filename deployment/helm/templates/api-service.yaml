@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "telemetry.fullname" . }}-api
+  labels:
+    app: {{ include "telemetry.name" . }}
+    component: api
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ include "telemetry.name" . }}
+    component: api
+  ports:
+    - name: http
+      port: {{ .Values.api.servicePort }}
+      targetPort: http
+      protocol: TCP
+
+    # - name: metrics
+    #   port: {{ .Values.metrics.port }}
+    #   targetPort: metrics
+    #   protocol: TCP

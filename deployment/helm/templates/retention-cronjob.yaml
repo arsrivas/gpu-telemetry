@@ -1,0 +1,30 @@
+{{- if .Values.retention.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "telemetry.fullname" . }}-retention
+  labels:
+    app: {{ include "telemetry.name" . }}
+    component: retention
+spec:
+  schedule: "{{ .Values.retention.schedule }}"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: retention
+              image: postgres:15
+              env:
+                - name: PGPASSWORD
+                  value: "{{ .Values.retention.dbPassword }}"
+              command:
+                - sh
+                - -c
+                - |
+                  psql "{{ .Values.global.postgres.dsn }}" <<EOF
+                  DELETE FROM telemetry
+                  WHERE ts < NOW() - INTERVAL '{{ .Values.retention.retentionDays }} days';
+                  EOF
+{{- end }}

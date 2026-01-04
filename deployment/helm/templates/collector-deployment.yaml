@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "telemetry.fullname" . }}-collector
+  labels:
+    app: {{ include "telemetry.name" . }}
+    component: collector
+spec:
+  replicas: {{ .Values.collector.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "telemetry.name" . }}
+      component: collector
+  template:
+    metadata:
+      labels:
+        app: {{ include "telemetry.name" . }}
+        component: collector
+    spec:
+      containers:
+        - name: collector
+          image: "{{ .Values.collector.image.repository }}:{{ .Values.collector.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_DSN
+              value: "{{ .Values.global.postgres.dsn }}"
+            - name: MQ_URL
+              value: "http://{{ include "telemetry.fullname" . }}-mq:{{ .Values.mq.servicePort }}"
+            - name: METRICS_ENABLED
+              value: "{{ .Values.metrics.enabled }}"
+            - name: METRICS_PORT
+              value: "{{ .Values.metrics.port }}"
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 5  
+          resources:
+            {{- toYaml .Values.collector.resources | nindent 12 }}

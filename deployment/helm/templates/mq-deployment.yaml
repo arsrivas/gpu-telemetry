@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "telemetry.fullname" . }}-mq
+  labels:
+    app: {{ include "telemetry.name" . }}
+    component: mq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "telemetry.name" . }}
+      component: mq
+  template:
+    metadata:
+      labels:
+        app: {{ include "telemetry.name" . }}
+        component: mq
+    spec:
+      containers:
+        - name: mq
+          image: "{{ .Values.mq.image.repository }}:{{ .Values.mq.image.tag }}"
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.mq.servicePort }}
+
+          resources:
+            {{- toYaml .Values.mq.resources | nindent 12 }}

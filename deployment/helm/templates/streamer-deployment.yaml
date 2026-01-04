@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "telemetry.fullname" . }}-streamer
+  labels:
+    app: {{ include "telemetry.name" . }}
+    component: streamer
+spec:
+  replicas: {{ .Values.streamer.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "telemetry.name" . }}
+      component: streamer
+  template:
+    metadata:
+      labels:
+        app: {{ include "telemetry.name" . }}
+        component: streamer
+    spec:
+      containers:
+        - name: streamer
+          image: "{{ .Values.streamer.image.repository }}:{{ .Values.streamer.image.tag }}"
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: MQ_URL
+              value: "http://{{ include "telemetry.fullname" . }}-mq:{{ .Values.mq.servicePort }}"
+
+            - name: METRICS_CSV_FILEPATH
+              value: "{{ .Values.streamer.csvPath }}"
+
+            - name: STREAM_INTERVAL_MS
+              value: "{{ .Values.streamer.intervalMs }}"
+
+          resources:
+            {{- toYaml .Values.streamer.resources | nindent 12 }}

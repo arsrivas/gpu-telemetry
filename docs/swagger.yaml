@@ -1,0 +1,94 @@
+basePath: /
+definitions:
+  model.ErrorResponse:
+    properties:
+      message:
+        example: invalid start_time
+        type: string
+    type: object
+  model.TelemetryResponse:
+    properties:
+      gpu_id:
+        type: string
+      id:
+        type: string
+      labels:
+        type: string
+      metric:
+        type: string
+      timestamp:
+        type: string
+      value:
+        type: number
+    type: object
+info:
+  contact: {}
+  description: REST API for querying GPU telemetry
+  title: GPU Telemetry API
+  version: "1.0"
+paths:
+  /api/v1/gpus:
+    get:
+      description: Returns all GPU IDs for which telemetry is available
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: List all GPUs
+      tags:
+      - GPUs
+  /api/v1/gpus/{id}/telemetry:
+    get:
+      description: Returns telemetry entries ordered by time
+      parameters:
+      - description: GPU ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Start time (Unix timestamp in seconds)
+        format: int64
+        in: query
+        name: start_time
+        type: integer
+      - description: End time (Unix timestamp in seconds)
+        format: int64
+        in: query
+        name: end_time
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.TelemetryResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Query telemetry by GPU
+      tags:
+      - Telemetry
+schemes:
+- http
+swagger: "2.0"
