@@ -9,6 +9,9 @@ NAMESPACE    := telemetry
 COMPONENTS := api collector mq streamer
 
 GO := go
+GOBIN    := $(shell $(GO) env GOBIN)
+GOPATH   := $(shell $(GO) env GOPATH)
+BIN_DIR  := $(if $(GOBIN),$(GOBIN),$(GOPATH)/bin)
 COVERAGE_FILE := coverage.out
 OS := $(shell go env GOOS)
 
@@ -194,7 +197,7 @@ undeploy:
 # ===============================
 # Swagger / OpenAPI
 # ===============================
-SWAG := $(GOPATH)/bin/swag
+SWAG := $(BIN_DIR)/swag
 
 .PHONY: swagger
 swagger: $(SWAG)
