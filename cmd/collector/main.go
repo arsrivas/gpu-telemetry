@@ -20,7 +20,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	logg, err := logger.NewLogger("info")
+	logg, err := logger.NewLogger(cfg.LogLevel)
 	if err != nil {
 		panic(err)
 	}

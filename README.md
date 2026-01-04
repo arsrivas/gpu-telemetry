@@ -183,12 +183,25 @@ http://localhost:8081/swagger/index.html
 ## Build & Run (Local)
 
 ### Prerequisites
-- Go >= 1.24
-- Docker
-- kubectl
-- Helm
-- Kind
-- swag
+
+The project has been tested with the following tool versions.  
+Other compatible versions may work as well.
+
+- **Go** ≥ 1.24  
+- **Docker** ≥ 25.x  
+- **kubectl** ≥ 1.34  
+- **Helm** ≥ 3.14  
+- **Kind** ≥ 0.31.0  
+
+Please ensure the tools are installed and available in your `PATH`.
+
+Installation guides:
+- https://go.dev/doc/install
+- https://docs.docker.com/get-docker/
+- https://kubernetes.io/docs/tasks/tools/
+- https://helm.sh/docs/intro/install/
+- https://kind.sigs.k8s.io/docs/user/quick-start/
+
 
 ### Environment validation
 
@@ -241,8 +254,13 @@ Uninstall chart
 make undeploy
 ```
 ## Helm Configuration
+Application configuration is defined in `values.yaml` and injected into pods
+as environment variables via the Helm chart.
+
+For local development, a `.env.example` file is provided for convenience.
 ### Scaling
-Streamers and Collectors are stateless and can be scaled via `values.yaml`:
+Collectors and Streamers are stateless and can be scaled by adjusting
+the replica count in `values.yaml`:
 ```
 collector:
   replicas: 2

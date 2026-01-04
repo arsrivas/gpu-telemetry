@@ -22,7 +22,7 @@ func NewPostgres(dsn string) (*PostgresStore, error) {
 	backoff := time.Second
 	var lastErr error
 
-	for attempt := 1; attempt <= 6; attempt++ {
+	for attempt := 1; attempt <= 7; attempt++ {
 		db, err := sql.Open("postgres", dsn)
 		if err != nil {
 			lastErr = err
@@ -39,7 +39,7 @@ func NewPostgres(dsn string) (*PostgresStore, error) {
 		}
 
 		log.Printf(
-			"[postgres] connection failed (attempt %d/5): %v — retrying in %s",
+			"[postgres] connection failed (attempt %d/7): %v — retrying in %s",
 			attempt,
 			lastErr,
 			backoff,

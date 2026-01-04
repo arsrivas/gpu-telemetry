@@ -21,16 +21,14 @@ spec:
         - name: streamer
           image: "{{ .Values.streamer.image.repository }}:{{ .Values.streamer.image.tag }}"
           imagePullPolicy: IfNotPresent
-
           env:
             - name: MQ_URL
               value: "http://{{ include "telemetry.fullname" . }}-mq:{{ .Values.mq.servicePort }}"
-
             - name: METRICS_CSV_FILEPATH
               value: "{{ .Values.streamer.csvPath }}"
-
             - name: STREAM_INTERVAL_MS
               value: "{{ .Values.streamer.intervalMs }}"
-
+            - name: LOG_LEVEL
+              value: {{ .Values.api.logLevel | default .Values.global.logLevel | quote }}  
           resources:
             {{- toYaml .Values.streamer.resources | nindent 12 }}

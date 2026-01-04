@@ -90,6 +90,11 @@ func (h *Handler) GetTelemetry(w http.ResponseWriter, r *http.Request) {
 		end = &ts
 	}
 
+	if start != nil && end != nil && *start > *end {
+		writeError(w, http.StatusBadRequest, "start_time must be <= end_time")
+		return
+	}
+
 	exists, err := h.store.GPUExists(gpuID)
 	if err != nil {
 		h.log.Error("failed to check GPU existence", zap.String("gpu_id", gpuID), zap.Error(err))

@@ -3,9 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
-	"strconv"
 
+	"gpu-telemetry/config"
 	"gpu-telemetry/pkg/mq"
 	mqhttp "gpu-telemetry/pkg/transport/mqhttp"
 	"gpu-telemetry/pkg/util/logger"
@@ -14,18 +13,13 @@ import (
 )
 
 func main() {
-	partitions := 4
-	if v := os.Getenv("MQ_PARTITIONS"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil {
-			partitions = p
-		}
-	}
-	logg, err := logger.NewLogger("info")
+	cfg := config.LoadMQConfig()
+	logg, err := logger.NewLogger(cfg.LogLevel)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	queue := mq.NewQueue[mq.Envelope](partitions)
+	queue := mq.NewQueue[mq.Envelope](cfg.MQPartitions)
 	server := mqhttp.NewServer(queue, logg)
 
 	logg.Info("mq server started", zap.String("addr", ":8080"))
