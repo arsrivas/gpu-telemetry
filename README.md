@@ -18,7 +18,7 @@ The system is designed to demonstrate:
 
 ## High-Level Architecture (HLD)
 
-![High-Level Architecture](docs/diagram/hld.svg)
+![High-Level Architecture](docs/diagram/sequnce.svg)
 
 ### Architectural Notes
 
@@ -77,6 +77,29 @@ The system is designed to demonstrate:
 - Idempotent inserts → safe to retry
 - Horizontally scalable
 
+#### Why Polling Instead of Push / PubSub
+
+Collectors use a polling model instead of push-based delivery.
+
+Reasons:
+- Collectors control backpressure
+- Avoids overloading slow consumers
+- Simpler failure recovery
+- Easier horizontal scaling
+
+Polling ensures the consumer dictates throughput, not the queue.
+
+#### Collector Autoscaling Strategy (Future Scope)
+
+The collector architecture is intentionally designed to support queue-driven autoscaling in the future.
+
+If queue depth grows faster than collector polling capacity, an autoscaling mechanism can be introduced where:
+
+- Queue depth or processing lag would be surfaced as a metric
+- Collectors could be horizontally scaled using an HPA or event-driven autoscaler
+- Scaling decisions would be based on backlog growth rather than CPU usage
+
+This approach preserves backpressure control while allowing the system to adapt to sustained increases in load without redesigning the collector.
 
 ### 4. Storage Layer
 
@@ -202,11 +225,23 @@ Installation guides:
 - https://helm.sh/docs/intro/install/
 - https://kind.sigs.k8s.io/docs/user/quick-start/
 
-
 ### Environment validation
 
 ```
 make preflight
+```
+### Create kind cluster (One-time setup)
+Create cluster
+```
+make kind-create
+```
+### One-command Quick Start
+
+Assuming a local Kind cluster already exists, the entire build and deployment flow can be executed
+using a single command
+
+```bash
+make all
 ```
 
 ### Unit testing
@@ -217,11 +252,6 @@ make test
 Run unit tests with coverage
 ```
 make coverage
-```
-### Create kind cluster
-Create cluster
-```
-make kind-create
 ```
 
 ### Build and load docker image

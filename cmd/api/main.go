@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
-	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"gpu-telemetry/config"
 	_ "gpu-telemetry/docs" // swag generated
@@ -24,6 +27,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	logg, err := logger.NewLogger(cfg.LogLevel)
 	if err != nil {
 		log.Fatal(err)
@@ -38,15 +42,45 @@ func main() {
 
 	h := api.NewHandler(store, logg)
 
-	logg.Info("API server starting",
-		zap.String("port", cfg.ServerPort),
-	)
-
-	if err := http.ListenAndServe(":"+cfg.ServerPort, api.Router(h)); err != nil {
-		logg.Error("API server stopped",
-			zap.Error(err),
-		)
-		os.Exit(1)
+	server := &http.Server{
+		Addr:    ":" + cfg.ServerPort,
+		Handler: api.Router(h),
 	}
 
+	// Context cancelled on SIGINT / SIGTERM
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		syscall.SIGINT,
+		syscall.SIGTERM,
+	)
+	defer stop()
+
+	// Start HTTP server
+	go func() {
+		logg.Info("API server starting",
+			zap.String("port", cfg.ServerPort),
+		)
+
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logg.Fatal("server failed",
+				zap.Error(err),
+			)
+		}
+	}()
+
+	// Block until signal received
+	<-ctx.Done()
+	logg.Info("shutdown signal received")
+
+	// Graceful shutdown with timeout
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logg.Error("graceful shutdown failed",
+			zap.Error(err),
+		)
+	} else {
+		logg.Info("server shut down gracefully")
+	}
 }
