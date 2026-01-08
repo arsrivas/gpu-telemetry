@@ -18,7 +18,7 @@ The system is designed to demonstrate:
 
 ## High-Level Architecture (HLD)
 
-![High-Level Architecture](docs/diagram/sequnce.svg)
+![High-Level Architecture](docs/diagram/sequence.svg)
 
 ### Architectural Notes
 
