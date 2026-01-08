@@ -23,7 +23,10 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: POSTGRES_DSN
-              value: "{{ .Values.global.postgres.dsn }}"
+              valueFrom:
+                secretKeyRef:
+                  name: telemetry-postgres-secret
+                  key: POSTGRES_DSN
             - name: MQ_URL
               value: "http://{{ include "telemetry.fullname" . }}-mq:{{ .Values.mq.servicePort }}"
             - name: LOG_LEVEL

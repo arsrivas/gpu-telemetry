@@ -13,7 +13,9 @@ metrics:
 
 global:
   postgres:
-    dsn: postgresql://telemetry:telemetry@telemetry-postgres:5432/telemetry?sslmode=disable
+    host: telemetry-postgres
+    port: 5432
+    sslMode: disable
   logLevel: info
 
 collector:
@@ -47,14 +49,8 @@ retention:
   enabled: true
   schedule: "0 * * * *"
   retentionDays: 1
-  dbPassword: telemetry
 
 postgresql:
-  auth:
-    username: telemetry
-    password: telemetry
-    database: telemetry
-
   primary:
     persistence:
       enabled: true

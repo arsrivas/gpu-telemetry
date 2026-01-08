@@ -20,15 +20,24 @@ The system is designed to demonstrate:
 
 ![High-Level Architecture](docs/diagram/sequence.svg)
 
-### Architectural Notes
+### Architecture Flow Explanation
 
-- **Streamers** and **Collectors** are stateless → scale horizontally
-- **Message Queue** provides at-least-once delivery semantics
-- **PostgreSQL** is the system of record
-- **TelemetryRetention** cron job cleans up old entries periodically
-- **API Gateway** reads directly from DB (not from collectors)
-- **Helm + Kubernetes** manage lifecycle and scaling
-- **Kind** is used for local cluster simulation
+1. **Streamers** read telemetry data from an external source (CSV in this implementation),
+   assign a globally unique telemetry ID, and enqueue events into the Message Queue.
+
+2. **The Message Queue** decouples ingestion from processing. It provides at-least-once
+   delivery semantics and exposes HTTP endpoints for enqueue, poll, and ack.
+   The queue itself does not perform deduplication.
+
+3. **Collectors** poll the queue in batches, persist telemetry into PostgreSQL,
+   and acknowledge messages only after successful persistence.
+   This makes collectors safe to retry and horizontally scalable.
+
+4. **PostgreSQL** acts as the system of record. It enforces idempotency and ordering
+   guarantees and supports efficient time-based queries.
+
+5. **The API Server** queries PostgreSQL directly and is intentionally decoupled
+   from collectors to avoid tight coupling and enable independent scaling.
 
 ---
 

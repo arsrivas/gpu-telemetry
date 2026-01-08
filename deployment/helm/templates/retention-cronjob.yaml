@@ -18,12 +18,31 @@ spec:
               image: postgres:15
               env:
                 - name: PGPASSWORD
-                  value: "{{ .Values.retention.dbPassword }}"
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "telemetry.fullname" . }}-postgres
+                      key: POSTGRES_PASSWORD
+                - name: PGHOST
+                  value: {{ .Values.postgres.host | quote }}
+                - name: PGPORT
+                  value: {{ .Values.postgres.port | quote }}
+                - name: PGSSLMODE
+                  value: {{ .Values.postgres.sslMode | quote }}
+                - name: PGDATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "telemetry.fullname" . }}-postgres
+                      key: POSTGRES_DB
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "telemetry.fullname" . }}-postgres
+                      key: POSTGRES_USER
               command:
                 - sh
                 - -c
                 - |
-                  psql "{{ .Values.global.postgres.dsn }}" <<EOF
+                  psql <<EOF
                   DELETE FROM telemetry
                   WHERE ts < NOW() - INTERVAL '{{ .Values.retention.retentionDays }} days';
                   EOF
