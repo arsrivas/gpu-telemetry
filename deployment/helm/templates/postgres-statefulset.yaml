@@ -22,46 +22,50 @@ spec:
         - name: postgres
           image: postgres:15
           imagePullPolicy: IfNotPresent
-
           ports:
             - containerPort: 5432
               name: postgres
-
           env:
             - name: POSTGRES_USER
-              value: "{{ .Values.postgresql.auth.username }}"
+              valueFrom:
+                secretKeyRef:
+                  name: telemetry-postgres-secret
+                  key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
-              value: "{{ .Values.postgresql.auth.password }}"
+              valueFrom:
+                secretKeyRef:
+                  name: telemetry-postgres-secret
+                  key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
-              value: "{{ .Values.postgresql.auth.database }}"
-
+              valueFrom:
+                secretKeyRef:
+                  name: telemetry-postgres-secret
+                  key: POSTGRES_DB
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
-
           readinessProbe:
             exec:
               command:
                 - sh
                 - -c
-                - pg_isready -U {{ .Values.postgresql.auth.username }}
+                - pg_isready -U $POSTGRES_USER
             initialDelaySeconds: 10
             periodSeconds: 10
-
           livenessProbe:
             exec:
               command:
                 - sh
                 - -c
-                - pg_isready -U {{ .Values.postgresql.auth.username }}
+                - pg_isready -U $POSTGRES_USER
             initialDelaySeconds: 30
             periodSeconds: 20
-
   volumeClaimTemplates:
     - metadata:
         name: data
       spec:
-        accessModes: ["ReadWriteOnce"]
+        accessModes:
+          - ReadWriteOnce
         resources:
           requests:
             storage: {{ .Values.postgresql.primary.persistence.size }}

@@ -31,10 +31,14 @@ func main() {
 		}
 	}
 
-	mq := client.NewMQClient(cfg.MQURL)
-	s := streamer.New(mq, cfg.MetricsCsvFilePath, interval, logg)
+	mqClient := client.NewMQClient(cfg.MQURL)
+
+	source := streamer.NewCSVSource(cfg.MetricsCsvFilePath, logg)
+	s := streamer.New(source, mqClient, interval, logg)
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
 	logg.Info("telemetry data streamer service started")
 	s.Run(ctx)
 }

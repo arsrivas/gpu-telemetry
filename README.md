@@ -18,17 +18,26 @@ The system is designed to demonstrate:
 
 ## High-Level Architecture (HLD)
 
-![High-Level Architecture](docs/diagram/hld.svg)
+![High-Level Architecture](docs/diagram/sequence.svg)
 
-### Architectural Notes
+### Architecture Flow Explanation
 
-- **Streamers** and **Collectors** are stateless → scale horizontally
-- **Message Queue** provides at-least-once delivery semantics
-- **PostgreSQL** is the system of record
-- **TelemetryRetention** cron job cleans up old entries periodically
-- **API Gateway** reads directly from DB (not from collectors)
-- **Helm + Kubernetes** manage lifecycle and scaling
-- **Kind** is used for local cluster simulation
+1. **Streamers** read telemetry data from an external source (CSV in this implementation),
+   assign a globally unique telemetry ID, and enqueue events into the Message Queue.
+
+2. **The Message Queue** decouples ingestion from processing. It provides at-least-once
+   delivery semantics and exposes HTTP endpoints for enqueue, poll, and ack.
+   The queue itself does not perform deduplication.
+
+3. **Collectors** poll the queue in batches, persist telemetry into PostgreSQL,
+   and acknowledge messages only after successful persistence.
+   This makes collectors safe to retry and horizontally scalable.
+
+4. **PostgreSQL** acts as the system of record. It enforces idempotency and ordering
+   guarantees and supports efficient time-based queries.
+
+5. **The API Server** queries PostgreSQL directly and is intentionally decoupled
+   from collectors to avoid tight coupling and enable independent scaling.
 
 ---
 
@@ -77,6 +86,29 @@ The system is designed to demonstrate:
 - Idempotent inserts → safe to retry
 - Horizontally scalable
 
+#### Why Polling Instead of Push / PubSub
+
+Collectors use a polling model instead of push-based delivery.
+
+Reasons:
+- Collectors control backpressure
+- Avoids overloading slow consumers
+- Simpler failure recovery
+- Easier horizontal scaling
+
+Polling ensures the consumer dictates throughput, not the queue.
+
+#### Collector Autoscaling Strategy (Future Scope)
+
+The collector architecture is intentionally designed to support queue-driven autoscaling in the future.
+
+If queue depth grows faster than collector polling capacity, an autoscaling mechanism can be introduced where:
+
+- Queue depth or processing lag would be surfaced as a metric
+- Collectors could be horizontally scaled using an HPA or event-driven autoscaler
+- Scaling decisions would be based on backlog growth rather than CPU usage
+
+This approach preserves backpressure control while allowing the system to adapt to sustained increases in load without redesigning the collector.
 
 ### 4. Storage Layer
 
@@ -128,8 +160,8 @@ The system is designed to demonstrate:
 
 ### Telemetry Query Parameters
 
-- `start_time` – Unix timestamp (seconds), optional
-- `end_time` – Unix timestamp (seconds), optional
+- `start_time` – RFC3339 timestamp (UTC), optional
+- `end_time` – RFC3339 timestamp (UTC), optional
 
 Telemetry is returned ordered by timestamp.
 
@@ -202,11 +234,23 @@ Installation guides:
 - https://helm.sh/docs/intro/install/
 - https://kind.sigs.k8s.io/docs/user/quick-start/
 
-
 ### Environment validation
 
 ```
 make preflight
+```
+### Create kind cluster (One-time setup)
+Create cluster
+```
+make kind-create
+```
+### One-command Quick Start
+
+Assuming a local Kind cluster already exists, the entire build and deployment flow can be executed
+using a single command
+
+```bash
+make all
 ```
 
 ### Unit testing
@@ -217,11 +261,6 @@ make test
 Run unit tests with coverage
 ```
 make coverage
-```
-### Create kind cluster
-Create cluster
-```
-make kind-create
 ```
 
 ### Build and load docker image
@@ -325,489 +364,20 @@ kubectl delete pvc data-telemetry-postgres-0 -n telemetry
 ---
 ## Design Tradeoffs
 
-### HTTP-based Queue vs gRPC / Binary Protocol
-**Pros**
-- Rapid prototyping
-- Apt for assignment usecase
-
-**Cons**
-- No streaming or long-lived connections
-
-
-### Single-instance MQ vs Distributed MQ
-**Pros**
-- Avoids complexity of leader election, coordination and partitioning
-
-**Cons**
-- Single point of failure
-- Limited horizontal scalability
-
-
-### In-memory Queue vs Durable Queue
-**Pros**
-- Simple implementation
-- Faster message access
-
-**Cons**
-- Messages lost on MQ microservice restart
-- No replay capability
-
-
-### At-least-once vs Exactly-once Delivery
-**Pros**
-- Prevents data loss under failure
-- Simpler and more reliable semantics
-
-**Cons**
-- Duplicate messages possible
-
-### Deduplication at Storage vs Queue
-**Pros**
-- Centralizes system of record
-- Simplifies MQ design
-
-**Cons**
-- Additional database overhead
-
-
-### Pull-based Consumption vs Push-based Delivery
-**Pros**
-- Collectors control backpressure
-- Predictable load handling
-
-**Cons**
-- Inefficient when queue is idle
-
-
-### Batch Polling vs Single-message Processing
-**Pros**
-- Higher throughput
-- Fewer database transactions
-
-**Cons**
-- Larger retry scope on partial failures
-
-### Custom PostgreSQL vs Bitnami / Managed Chart
-**Pros**
-- Rapid prototyping and avoids legacy bitnami charts
-- Explicit schema ownership
-
-**Cons**
-- No built-in HA, backups, or upgrades
-- More operational responsibility
-
-
-### No Rate Limiting at Ingestion
-**Pros**
-- Simple streamer implementation
-- Maximizes ingestion speed
-
-**Cons**
-- Risk of downstream pressure
-- Relies on MQ and collectors to absorb bursts
-
-### No Replay / Backfill Support
-**Pros**
-- Reduced storage and complexity
-- Clear data lifecycle
-
-**Cons**
-- Historical reprocessing not possible
-- Harder to recover from logical bugs
-
-### No Autoscaling (HPA)
-**Pros**
-- Predictable and deterministic behavior
-- Easy to reason about scaling
-
-**Cons**
-- Manual intervention required
-- No dynamic response to load
-
-### Logs-first Observability vs Metrics & Tracing
-**Pros**
-- Simple setup, effective debugging
-
-**Cons**
-- Limited visibility into latency and throughput
-
-### CSV telemetry data ingestion
-- Each streamer replica reads own CSV and acts as source of data
+| Design Area | Decision (Chosen) | Alternative | Why This Choice | What We Deliberately Give Up |
+|------------|------------------|-------------|-----------------|------------------------------|
+| **Queue Protocol** | HTTP-based Queue | gRPC / Binary Protocol | • Rapid prototyping<br>• Apt for assignment use case | • No streaming support<br>• No long-lived connections |
+| **MQ Topology** | Single-instance MQ | Distributed MQ | • Avoids leader election complexity<br>• Avoids coordination and partitioning | • Single point of failure<br>• Limited horizontal scalability |
+| **Queue Durability** | In-memory Queue | Durable Queue | • Simple implementation<br>• Faster message access | • Messages lost on MQ restart<br>• No replay capability |
+| **Delivery Semantics** | At-least-once Delivery | Exactly-once Delivery | • Prevents data loss under failure<br>• Simpler delivery semantics | • Duplicate messages possible |
+| **Deduplication Strategy** | Storage-level Deduplication | Queue-level Deduplication | • Centralizes system of record<br>• Simplifies MQ design | • Database overhead |
+| **Consumption Model** | Pull-based Consumption | Push-based Delivery | • Collectors control backpressure<br>• Predictable load handling | • Inefficient polling when queue is idle |
+| **Processing Mode** | Batch Polling | Single-message Processing | • Higher throughput<br>• Fewer database transactions | • Larger retry scope on partial failures |
+| **PostgreSQL Deployment** | Custom PostgreSQL | Bitnami / Managed Chart | • Rapid prototyping<br>• Explicit schema ownership | • No built-in HA, backups, or upgrades<br>• More operational responsibility |
+| **Ingestion Control** | No Rate Limiting | Rate-limited Ingestion | • Simple streamer implementation<br>• Maximizes ingestion speed | • Risk of downstream pressure<br>• Relies on MQ and collectors to absorb bursts |
+| **Replay Capability** | No Replay / Backfill | Replay-enabled Pipeline | • Reduced storage and complexity<br>• Clear data lifecycle | • Historical reprocessing not possible<br>• Harder recovery from logical bugs |
+| **Autoscaling** | No HPA | HPA-based Autoscaling | • Predictable and deterministic behavior<br>• Easy to reason about scaling | • Manual intervention required<br>• No dynamic response to load |
+| **Observability** | Logs-first Observability | Metrics & Tracing | • Simple setup<br>• Effective debugging | • Limited visibility into latency and throughput |
+| **Telemetry Source** | CSV per Streamer Replica | Real-time Telemetry Source | • Each replica acts as independent data source<br>• No coordination required | • Not representative of real-time telemetry |
 
 ---
-## Use of AI Assistance
-
-AI (ChatGPT) was used **as an assistance and acceleration tool** during development. All final architectural decisions, correctness guarantees, production hardening, and validation logic placement were performed manually by the developer.
-The system design, debugging, and final correctness required **significant manual reasoning**, iteration, and correction.
-
----
-### End-to-End Development Workflow Overview
-
-The project was developed in the following ordered phases:
-
-1. Architecture design and trade-off analysis
-2. Project & repository bootstrapping
-3. Code bootstrapping (API, storage, validation)
-4. Unit test development
-5. Build & local development environment setup
-6. Documentation & README finalization
-
----
-### 1. Initial Architecture Discussions
-
-**Prompt examples (paraphrased):**
-- Help me design an elastic GPU telemetry pipeline with a custom message queue in Go based on requirement "assignment-document-text".
-- How should streamer, collector, and custom message queue interact if they scale dynamically?
-- Should the custom MQ use HTTP or gRPC considering scale of assignment?
-- Considering scale help me in defining scope of the message queue.
-
-**AI contribution:**
-- Helped outline the initial component set:
-  - Streamer
-  - Message Queue
-  - Collector
-  - API
-  - Storage
-- Validated that streamers and collectors should be stateless.
-- Reasoned that HTTP is sufficient to handle transport for MQ.
-- Helped to define a reasonable outline and scope for the Message Queue.
-
-**Where AI fell short:**
-- Early suggestions underestimated **coordination problems with multiple streamers**.
-- Initial guidance did not clearly explain how **multiple streamers enqueueing identical GPU IDs** should be handled.
-- Required manual clarification that **GPU ID is not a unique telemetry key**, and that **UUID-based event IDs** are required.
-
-**Manual intervention:**
-- Explicitly defined telemetry identity as:
-
-`telemetry_id = UUID (generated by streamer)`
-
-`gpu_id = stable GPU UUID`
-- Moved deduplication responsibility **out of the MQ** and **into storage**.
-
-### 2. Project / Repository Bootstrapping
-
-####  What AI helped with
-- Validate the overall system architecture against the problem statement
-- Identify required components (Streamer, MQ, Collector, API, Storage)
-- Propose an initial folder structure aligned with Go and Kubernetes best practices
-
-#### Prompts Used
-
-- Suggest a clean monorepo folder structure for a Go-based microservices system to be deployed on Kubernetes
-
-
-#### Where AI Fell Short
-
-- Missed few things in initial responses like Makefile, build folders etc.
-- Required some restructuring
-
-#### Manual Intervention
-
-- Repository layout finalized manually
-- Makefile, docker build, helm folders were added manually
-
----
-### 3. Code bootstrapping
-
-**AI assistance was used to:**
-- Generate initial Go skeletons for services
-- Draft interface definitions (e.g., `storage.Store`)
-- Propose idiomatic Go patterns (table-driven tests, interfaces, logging)
-
-**Example prompts used:**
-- Generate boilerplate code for custom message queue, api server, collector and streamer
-- As a Go expert generate code for Go collector that polls a custom MQ and persists data
-- Help me design a storage interface for telemetry persistence
-- Rewrite this handler using idiomatic Go error handling and zap logging
-- I need code for an HTTP based Message queue with enqueue, poll and ack handlers
-- Suggest a PostgreSQL schema for time-series GPU telemetry data.
-- Provide example SQL queries for time-range telemetry retrieval.
-- Help to implement API server with following routes
-- Implement storage pkg with methods to insert telemetry data into DB and read telemetry data from DB as per optional start time and end time query parameters received from API request
-- Implement streamer pkg to read data from CSV file and push into message queue. 
-
-
-**Where AI fell short:**
-- CSV parsing logic initially failed on malformed input and quoting issues
-- Some generated code assumed ideal inputs and lacked defensive checks
-- Required to and fro guidance to achieve working output
-
-**Manual intervention required:**
-- Debugging CSV parsing issues caused by inconsistent quoting and delimiters
-- Fixing interface mismatches (`Close`, `Insert`, `Ping` methods missing)
-- Correcting error-handling logic to avoid fatal crashes in Kubernetes
-- Ensuring correct database reconnection and readiness probe
-
----
-### 4. Unit test development
-
-**Example prompts used:**
-- Write list format unit tests for this HTTP handler
-- Add test cases for invalid query parameters and dependency failures
-
-**AI assistance was used to:**
-- Identify key test cases (happy path, invalid input, dependency failure)
-- Generate example HTTP handler tests using `httptest`
-
-**Where AI fell short:**
-- Initial tests were incomplete and did not cover interface contract mismatches
-- Mock implementations were missing required methods
-
-**Manual intervention required:**
-- Completing mock implementations to fully satisfy `storage.Store`
-- Fixing test setup to correctly inject URL params
-- Expanding test coverage for:
-  - Invalid `start_time` / `end_time`
-  - Storage failures (`GPUExists` error, `Telemetry` fetch failure)
----
-### 5. Build and deployment environment
-
-**Example prompts used:**
-- Build a Makefile to run tests, build images, load into Kind, and deploy via Helm
-- Help me design Helm charts for multiple microservices
-- How to install a kind cluster for local development
-- Build manifests to deploy Postgres without using any 3rd party or open source charts or operators
-**AI assistance was used to:**
-- Draft a multi-service Makefile
-- Suggest Helm chart structure
-- Propose Kubernetes deployment manifests
-
-**Where AI fell short:**
-- Helm dependency handling (PostgreSQL) required manual debugging
-- Kubernetes networking and service discovery issues required manual fixes
-- Environment variable mapping via Viper was initially incorrect
-
-**Manual intervention required:**
-- Debugging Postgres connectivity issues in Kubernetes
-- Fixing environment variable propagation (`POSTGRES_DSN`)
-- Adjusting readiness probes to avoid incorrect failures
-- Ensuring Kind image loading semantics were correct
-
----
-
-## 6. Documentation & Design Artifacts
-**Prompt example**
-- Give me a single file in github markdown code language based on following Makefile.
-
-**AI assistance was used to:**
-- Draft README structure
-- Improve clarity of design trade-offs
-- Generate architectural explanations
-
-**Manual intervention required:**
-- Ensuring documentation matches actual behavior
-- Correcting misleading or oversimplified AI-generated explanations
-- Refining wording to be interview-appropriate and technically precise
-
----
-
-## Some more examples where manual intervention was required 
-
-## 1. Storage Layer Decisions (SQLite → PostgreSQL)
-
-### Early Storage Suggestion
-
-**AI suggestion (early):**
-- Use SQLite for simplicity and persistence.
-
-**Why this fell short:**
-- SQLite does not scale across multiple collector replicas.
-- SQLite file locking becomes problematic in Kubernetes.
-- Conflicts with the requirement that collectors scale dynamically.
-
-**Manual correction:**
-- Storage was redesigned to use **PostgreSQL** as the system of record.
-- API and collectors were updated to **read/write directly to Postgres**.
-- SQLite was fully removed from the design.
-
-**Lesson learned:**
-> AI tends to optimize for simplicity unless explicitly constrained by scalability requirements.
-
----
-
-## 2. Streamer CSV Parsing Failures
-
-### CSV Handling
-
-**Prompt examples:**
-- “Fix this streamer CSV parsing code”
-- “Why am I seeing missing value field continuously?”
-
-**AI contribution:**
-- Suggested using `encoding/csv`
-- Added `LazyQuotes`, `FieldsPerRecord = -1`
-
-**Where AI fell short:**
-- Assumed column positions instead of header-based parsing
-
-**Manual intervention:**
-- Added debug logging of raw rows
-- Switched to **header-based column mapping**
-- Confirmed actual structure
-
-**Outcome:**
-Streamer parsing became robust only after **manual inspection of real CSV rows**.
-
----
-
-## 3. Message Queue Semantics & ACK Handling
-
-### MQ + Collector Interaction
-
-**Prompt examples:**
-- “Is it doing deduplication by any chance?”
-- “Do we have ack semantics?”
-
-**AI contribution:**
-- Suggested at-least-once delivery
-- Introduced Poll + Ack model
-
-**Where AI fell short:**
-- Initial explanations blurred responsibility between MQ and storage
-- Did not clearly enforce “ACK only after persistence”
-
-**Manual intervention:**
-- Explicitly defined:
-- MQ is **delivery-only**
-- Storage enforces idempotency
-- Collector ACKs **after successful DB insert**
-
-**Result:**
-A clean, explainable message-processing pipeline suitable for interviews.
-
----
-
-## 4. API Design & Data Ownership
-
-### API vs Collector Confusion
-
-**Prompt examples:**
-- “Why can’t API ask collector?”
-- “Collectors scale — how will API handle this?”
-
-**AI contribution:**
-- Explained standard microservice patterns
-
-**Where clarification was needed:**
-- Reinforced that **API must not depend on collectors**
-- Clarified that **database is the contract boundary**
-
-**Manual decision:**
-- API reads directly from Postgres
-- Collector is write-only
-- Clear ownership boundaries
-
----
-
-## 5. Configuration & Environment Variables (Viper Issues)
-
-### Config Loading Problems
-
-**Prompt examples:**
-- “Why env is present but config is empty?”
-- “POSTGRES_DSN is required but env exists”
-
-**AI contribution:**
-- Suggested Viper usage
-- Introduced `AutomaticEnv`
-
-**Where AI fell short:**
-- Mixed dot-notation and ENV-style keys
-- Overcomplicated config mapping
-- Caused silent misconfigurations in Kubernetes
-
-**Manual fix:**
-- Abandoned dot-based config
-- Standardized on **ENV-only configuration**
-- Created separate configs for API and Collector
-
-**Lesson learned:**
-> For Kubernetes, ENV-only configs are clearer and safer than hybrid approaches.
-
----
-
-## 6. Helm & PostgreSQL Deployment Issues
-
-### PostgreSQL Image & Helm Dependency Problems
-
-**Prompt examples:**
-- “Why image pull is failing?”
-- “Why postgres worked before but not now?”
-
-**AI contribution:**
-- Suggested Bitnami PostgreSQL chart
-- Provided values.yaml structure
-
-**Where AI fell short:**
-- Did not anticipate Bitnami Postgres Helm Chart is no longer open source
-- Image tag availability issues
-
-**Manual intervention:**
-- Debugged image pull failures manually
-- Considered shipping Postgres manifests directly
-
----
-
-## 7. Unit Testing & Mock Failures
-
-### API Handler Unit Tests
-
-**Prompt examples:**
-- “Write UT for this handler”
-- “Cover invalid end_time testcase”
-
-**AI contribution:**
-- Provided table-driven test structure
-- Identified missing test cases
-
-**Where AI fell short:**
-- Mock implementations were incomplete
-- Missed required interface methods (`Insert`, `Close`)
-- Tests initially failed due to missing router context
-
-**Manual fixes:**
-- Completed mock implementations
-- Injected `chi.RouteContext` correctly
-- Added error-path tests:
-- `GPUExists` failure
-- `Telemetry` fetch failure
-
----
-
-## 8. Makefile & Build System
-
-**AI contribution:**
-- Drafted a comprehensive Makefile
-- Suggested targets for test, build, deploy, swagger
-
-**Manual improvements:**
-- Fixed Windows compatibility issues
-- Clarified Kind image loading
-- Documented Makefile commands explicitly in README
-
----
-
-## Summary of AI vs Manual Work
-
-| Area | AI Accelerated | Manual Required |
-|----|----|----|
-Architecture | Initial outline | Final decisions |
-Streamer parsing | Skeleton | Debugging real data |
-Storage choice | Suggested SQLite | Migrated to Postgres |
-MQ semantics | Concepts | Correct ACK behavior |
-Config handling | Viper usage | ENV-only redesign |
-Helm/Postgres | Values structure | Image/debug fixes |
-Unit tests | Structure | Correctness & mocks |
-
----
-
-## Final Assessment
-
-AI significantly **accelerated iteration speed**, but:
-
-- **Did not replace architectural judgment**
-- **Did not handle real-world edge cases**
-- **Required continuous human validation**
-
-The final system reflects **intentional decisions**.

@@ -1,0 +1,61 @@
+@startuml
+title GPU Telemetry Pipeline
+
+participant DataSource as DS
+participant Streamer
+participant "Message Queue" as MQ
+participant Collector
+database PostgreSQL
+participant "API Server" as API
+
+== Ingestion ==
+
+Streamer -> DS : Read and process data
+Streamer -> MQ : Enqueue telemetry data
+
+== Consumption ==
+
+Collector -> MQ : Poll message
+MQ --> Collector : Telemetry message
+
+note right of Collector
+  Poll-based consumption
+  Collector controls throughput
+end note
+
+== Processing & Acknowledgement ==
+
+Collector -> PostgreSQL : Persist telemetry (transaction)
+
+alt Persistence succeeds
+    PostgreSQL --> Collector : Commit OK
+    Collector -> MQ : Ack message
+    note right of Collector
+      Message removed from queue
+      only after successful commit
+    end note
+
+else Persistence fails OR Collector crashes
+    PostgreSQL --> Collector : Error / No response
+    note right of Collector
+      No acknowledgment sent
+    end note
+
+    note right of MQ
+      Message remains unacknowledged
+      Eligible for redelivery
+      according to queue semantics
+    end note
+end
+
+== Query ==
+
+API -> PostgreSQL : Query telemetry
+PostgreSQL --> API : Results
+
+note right of API
+  Read-only access
+  No direct queue interaction
+end note
+
+@enduml
