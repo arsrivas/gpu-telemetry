@@ -12,11 +12,12 @@ metrics:
   port: "9090"
 
 global:
-  postgres:
-    host: telemetry-postgres
-    port: 5432
-    sslMode: disable
   logLevel: info
+
+postgres:
+  host: telemetry-postgres
+  port: 5432
+  sslMode: disable
 
 collector:
   replicas: 2
