@@ -20,7 +20,7 @@ spec:
                 - name: PGPASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: {{ include "telemetry.fullname" . }}-postgres
+                      name: {{ include "telemetry.fullname" . }}-postgres-secret
                       key: POSTGRES_PASSWORD
                 - name: PGHOST
                   value: {{ .Values.postgres.host | quote }}
@@ -31,12 +31,12 @@ spec:
                 - name: PGDATABASE
                   valueFrom:
                     secretKeyRef:
-                      name: {{ include "telemetry.fullname" . }}-postgres
+                      name: {{ include "telemetry.fullname" . }}-postgres-secret
                       key: POSTGRES_DB
                 - name: PGUSER
                   valueFrom:
                     secretKeyRef:
-                      name: {{ include "telemetry.fullname" . }}-postgres
+                      name: {{ include "telemetry.fullname" . }}-postgres-secret
                       key: POSTGRES_USER
               command:
                 - sh
