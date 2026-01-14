@@ -48,7 +48,7 @@ mq:
 
 retention:
   enabled: true
-  schedule: "0 * * * *"
+  schedule: "*/2 * * * *"
   retentionDays: 1
 
 postgresql:
